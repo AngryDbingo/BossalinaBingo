@@ -404,6 +404,91 @@ function init(){
 }
 
 init();
+</script<script>
+const phrases = [
+  "Hands on the head guy",
+  "Head popped off",
+  "Squished head",
+  "Shot by cop",
+  "Shot by bad guy",
+  "I belong here",
+  "Hands on the face guy",
+  "Never stand under the load",
+  "Matt's still awake",
+  "Crushed by a robot",
+  "Limb removal",
+  "Head popped off",
+  "The Mangler",
+  "Should've gone around the back",
+  "Don't touch the spool",
+  "Never reach over the spool",
+  "Never pet a wild animal",
+  "AngryD complains about view count",
+  "Red leaves",
+  "Red comes back",
+  "Red comes back again",
+  "Full scorpion",
+  "Bonk",
+  "Snack time",
+  "Target fixation",
+  "Impaled"
+];
+
+// Fisher-Yates shuffle
+function shuffle(array) {
+  let m = array.length, i;
+  while (m) {
+    i = Math.floor(Math.random() * m--);
+    [array[m], array[i]] = [array[i], array[m]];
+  }
+  return array;
+}
+
+function generateCard() {
+  const grid = document.querySelector(".bingo-grid");
+  grid.innerHTML = "";
+  
+  const shuffled = shuffle([...phrases]);
+  const selected = shuffled.slice(0, 24); // 24 because the center is "FREE"
+
+  let index = 0;
+  for (let row = 0; row < 5; row++) {
+    for (let col = 0; col < 5; col++) {
+      const cell = document.createElement("div");
+      cell.classList.add("bingo-cell");
+      if (row === 2 && col === 2) {
+        cell.classList.add("free");
+        cell.textContent = "FREE";
+      } else {
+        cell.textContent = selected[index++];
+      }
+      cell.addEventListener("click", () => {
+        cell.classList.toggle("marked");
+        checkBingo();
+      });
+      grid.appendChild(cell);
+    }
+  }
+}
+
+function checkBingo() {
+  const cells = [...document.querySelectorAll(".bingo-cell")];
+  const lines = [];
+
+  for (let i = 0; i < 5; i++) {
+    lines.push(cells.slice(i*5, i*5+5));
+    lines.push([cells[i], cells[i+5], cells[i+10], cells[i+15], cells[i+20]]);
+  }
+  lines.push([cells[0], cells[6], cells[12], cells[18], cells[24]]);
+  lines.push([cells[4], cells[8], cells[12], cells[16], cells[20]]);
+
+  const hasBingo = lines.some(line => line.every(c => c.classList.contains("marked")));
+  if (hasBingo) confetti();
+}
+
+document.querySelector("#newCard").addEventListener("click", generateCard);
+window.onload = generateCard;
 </script>
+>
 </body>
 </html>
