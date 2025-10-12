@@ -1,0 +1,410 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Bossalina Bingo</title>
+  <style>
+    :root{
+      --bg:#0f0f10;
+      --panel:#1a1a1b;
+      --muted:#9aa0a6;
+      --accent:#6dd07b;
+      --card-bg:linear-gradient(180deg,#151516,#0f0f10);
+      --tile-border: #2b2b2c;
+    }
+    html,body{height:100%;}
+    body{
+      margin:0;
+      font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+      background: radial-gradient(1200px 600px at 10% 10%, #111 0%, transparent 10%), var(--bg);
+      color:#e8e8e8;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding:24px;
+    }
+    .app{
+      width:100%;
+      max-width:980px;
+      background:var(--panel);
+      border-radius:16px;
+      padding:20px;
+      box-shadow: 0 8px 30px rgba(0,0,0,0.6);
+      border:1px solid #232324;
+    }
+    header{display:flex;align-items:center;gap:16px;margin-bottom:14px}
+    h1{font-size:20px;margin:0}
+    .controls{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+    button, .btn{
+      background:#222;
+      color:#eee;
+      border:1px solid #2f2f30;
+      padding:8px 12px;border-radius:8px;cursor:pointer;
+      font-weight:600;
+    }
+    button.secondary{background:transparent;border:1px solid #333;color:var(--muted);font-weight:500}
+    .row{display:flex;gap:12px}
+    .left{flex:1}
+    .right{width:320px}
+    .card-wrap{background:var(--card-bg);padding:16px;border-radius:12px;border:1px solid #1f1f20}
+    .grid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
+    .tile{
+      position:relative;
+      padding:10px;
+      min-height:92px;
+      border-radius:10px;
+      background:linear-gradient(180deg,#1a1a1b,#0f0f10);
+      border:1px solid var(--tile-border);
+      display:flex;align-items:center;justify-content:center;text-align:center;padding:12px;font-size:14px;line-height:1.15;
+      user-select:none;
+    }
+    .tile.free{background:linear-gradient(180deg,#202020,#141414);font-weight:700;color:#cfead1}
+    .tile .mark{
+      position:absolute;inset:6px;border-radius:8px;display:flex;align-items:center;justify-content:center;pointer-events:none;opacity:0;transition:opacity .18s ease;
+    }
+    .tile.marked .mark{opacity:1}
+    .mark .circle{width:80%;height:80%;border-radius:50%;background:rgba(109,208,123,0.24);backdrop-filter: blur(2px);box-shadow: inset 0 1px 0 rgba(255,255,255,0.02)}
+    .tile .text{z-index:2;padding:6px}
+    .tile.bingo-line{box-shadow:0 0 0 3px rgba(109,208,123,0.06) inset, 0 0 18px rgba(109,208,123,0.03)}
+    .tile.win{outline:3px solid rgba(109,208,123,0.16)}
+    .meta{display:flex;align-items:center;gap:8px;justify-content:space-between;margin-bottom:10px}
+    textarea{width:100%;height:120px;background:#0f0f10;border:1px solid #232323;color:#ddd;padding:10px;border-radius:8px}
+    label{font-size:13px;color:var(--muted)}
+    .small{font-size:13px;color:var(--muted)}
+    .actions{display:flex;gap:8px;flex-wrap:wrap}
+    .seed{font-family:monospace;background:#0f0f10;padding:6px 8px;border-radius:8px;border:1px solid #222}
+    footer{margin-top:14px;font-size:13px;color:var(--muted)}
+    /* confetti */
+    .confetti-piece{position:fixed;width:10px;height:16px;opacity:0.95;z-index:9999;pointer-events:none;border-radius:2px}
+    @media (max-width:880px){
+      .right{width:100%}
+      .row{flex-direction:column}
+      .tile{min-height:76px}
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <h1>Bossalina Bingo</h1>
+      <div class="small">5×5 — click squares to mark — center is a FREE space</div>
+    </header>
+
+    <div class="controls row">
+      <div class="left">
+        <div class="meta">
+          <div class="actions">
+            <button id="randomBtn">Get Random Card</button>
+            <button id="copyLinkBtn">Copy Link</button>
+            <button id="resetMarksBtn" class="secondary">Clear Marks</button>
+          </div>
+          <div class="small">Seed: <span id="seedView" class="seed">—</span></div>
+        </div>
+
+        <div class="card-wrap">
+          <div id="grid" class="grid" role="grid" aria-label="Bossalina Bingo card"></div>
+        </div>
+      </div>
+
+      <aside class="right">
+        <div style="margin-bottom:8px"><label>Phrases (one per line) — you can add more, they'll persist locally</label></div>
+        <textarea id="phrasesInput" placeholder="Paste phrases here, one per line"></textarea>
+        <div style="display:flex;gap:8px;margin-top:8px"><button id="savePhrasesBtn">Save Phrases</button><button id="restoreDefaultsBtn" class="secondary">Restore Defaults</button></div>
+        <div style="margin-top:12px" class="small">Tip: use the "Get Random Card" button after updating phrases to generate a new card. Share a unique card using the copy link button.</div>
+      </aside>
+    </div>
+
+    <footer>Made for your stream — host on GitHub Pages by uploading this file to a public repo and enabling Pages.</footer>
+  </div>
+
+<script>
+// ---- Default phrases provided by user ----
+const DEFAULT_PHRASES = [
+  "Hands on the head guy",
+  "Head popped off",
+  "Squished head",
+  "Shot by cop",
+  "Shot by bad guy",
+  "I belong here",
+  "Hands on the face guy",
+  "Never stand under the load",
+  "Matt's still awake",
+  "Crushed by a robot",
+  "Limb removal",
+  "Head popped off",
+  "The Mangler",
+  "Should've gone around the back",
+  "Don't touch the spool",
+  "Never reach over the spool",
+  "Never pet a wild animal",
+  "AngryD complains about view count",
+  "Red leaves",
+  "Red comes back",
+  "Red comes back again",
+  "Full scorpion",
+  "Bonk",
+  "Snack time",
+  "Target fixation",
+  "Impaled"
+];
+// ---- Utilities ----
+function qs(sel){return document.querySelector(sel)}
+function qsa(sel){return Array.from(document.querySelectorAll(sel))}
+
+// Seeded RNG (Mulberry32)
+function makeRand(seed){
+  let t = seed >>> 0;
+  return function(){
+    t += 0x6D2B79F5 | 0;
+    var r = Math.imul(t ^ t >>> 15, 1 | t);
+    r ^= r + Math.imul(r ^ r >>> 7, 61 | r);
+    return ((r ^ r >>> 14) >>> 0) / 4294967296;
+  }
+}
+
+function seededShuffle(array,seed){
+  let a = array.slice();
+  let rand = makeRand(seed);
+  for(let i=a.length-1;i>0;i--){
+    let j = Math.floor(rand()*(i+1));
+    [a[i],a[j]]=[a[j],a[i]];
+  }
+  return a;
+}
+
+function uid(){return Math.floor(Math.random()*1e9).toString(36)}
+
+// ---- State ----
+const storageKeys = {phrases:'bossalina_phrases_v1'};
+function loadPhrases(){
+  const raw = localStorage.getItem(storageKeys.phrases);
+  if(!raw) return DEFAULT_PHRASES.slice();
+  const arr = JSON.parse(raw);
+  if(!Array.isArray(arr) || arr.length===0) return DEFAULT_PHRASES.slice();
+  return arr.slice();
+}
+function savePhrases(arr){localStorage.setItem(storageKeys.phrases,JSON.stringify(arr));}
+
+let phrases = loadPhrases();
+let currentSeed = null;
+let marks = new Set(); // indexes marked 0..24
+
+// ---- DOM refs ----
+const gridEl = qs('#grid');
+const phrasesInput = qs('#phrasesInput');
+const savePhrasesBtn = qs('#savePhrasesBtn');
+const restoreDefaultsBtn = qs('#restoreDefaultsBtn');
+const randomBtn = qs('#randomBtn');
+const copyLinkBtn = qs('#copyLinkBtn');
+const resetMarksBtn = qs('#resetMarksBtn');
+const seedView = qs('#seedView');
+
+// ---- Render / Card logic ----
+function buildCard(seed){
+  marks.clear();
+  currentSeed = seed || Math.floor(Math.random()*1e9);
+  // persist seed in url
+  const url = new URL(window.location.href);
+  url.searchParams.set('seed', currentSeed);
+  window.history.replaceState({}, '', url.toString());
+  seedView.textContent = currentSeed;
+
+  // choose 24 phrases (center free)
+  const pool = phrases.slice();
+  // If pool has less than 24, repeat items as needed
+  while(pool.length < 24){ pool.push(...phrases); if(pool.length>500) break; }
+  const shuffled = seededShuffle(pool, currentSeed);
+  const selected = shuffled.slice(0,24);
+
+  // place into 5x5 with center free at index 12
+  const cells = [];
+  let sIdx=0;
+  for(let i=0;i<25;i++){
+    if(i===12) cells.push('FREE');
+    else cells.push(selected[sIdx++]);
+  }
+
+  renderGrid(cells);
+}
+
+function renderGrid(cells){
+  gridEl.innerHTML='';
+  cells.forEach((text,i)=>{
+    const tile = document.createElement('button');
+    tile.className='tile';
+    tile.type='button';
+    tile.setAttribute('data-index', i);
+    tile.setAttribute('role','gridcell');
+    tile.setAttribute('aria-label', text);
+    if(i===12){tile.classList.add('free');}
+
+    const markWrap = document.createElement('div'); markWrap.className='mark';
+    const circle = document.createElement('div'); circle.className='circle';
+    markWrap.appendChild(circle);
+
+    const textEl = document.createElement('div'); textEl.className='text';
+    textEl.innerText = text;
+
+    tile.appendChild(markWrap);
+    tile.appendChild(textEl);
+
+    tile.addEventListener('click',(e)=>{
+      const idx = Number(tile.dataset.index);
+      toggleMark(idx, tile);
+    });
+
+    gridEl.appendChild(tile);
+
+    // if center free, auto-mark it
+    if(i===12){markIndex(i,true,tile,false)}
+  });
+  checkBingo();
+}
+
+function markIndex(idx, on, tileEl, animate=true){
+  const tile = tileEl || gridEl.querySelector(`[data-index='${idx}']`);
+  if(on){
+    marks.add(idx);
+    tile.classList.add('marked');
+  } else {
+    marks.delete(idx);
+    tile.classList.remove('marked');
+  }
+  checkBingo();
+}
+
+function toggleMark(idx,tileEl){
+  if(idx===12) return; // can't unmark center free
+  const is = marks.has(idx);
+  markIndex(idx, !is, tileEl, true);
+}
+
+// Bingo detection: rows, cols, diagonals. Returns array of winning lines (each line is array of idxs)
+function getWinningLines(){
+  const lines = [];
+  const M = (r,c)=>r*5+c;
+  // rows
+  for(let r=0;r<5;r++){
+    const idxs = [M(r,0),M(r,1),M(r,2),M(r,3),M(r,4)];
+    if(idxs.every(i=>i===12||marks.has(i))) lines.push(idxs);
+  }
+  // cols
+  for(let c=0;c<5;c++){
+    const idxs = [M(0,c),M(1,c),M(2,c),M(3,c),M(4,c)];
+    if(idxs.every(i=>i===12||marks.has(i))) lines.push(idxs);
+  }
+  // diags
+  const d1=[M(0,0),M(1,1),M(2,2),M(3,3),M(4,4)];
+  const d2=[M(0,4),M(1,3),M(2,2),M(3,1),M(4,0)];
+  if(d1.every(i=>i===12||marks.has(i))) lines.push(d1);
+  if(d2.every(i=>i===12||marks.has(i))) lines.push(d2);
+
+  return lines;
+}
+
+function checkBingo(){
+  // clear previous win highlights
+  qsa('.tile').forEach(t=>{t.classList.remove('win'); t.classList.remove('bingo-line');});
+  const wins = getWinningLines();
+  if(wins.length>0){
+    // highlight tiles in wins
+    wins.forEach(line=>{
+      line.forEach(idx=>{
+        const tile = gridEl.querySelector(`[data-index='${idx}']`);
+        if(tile) tile.classList.add('bingo-line');
+      });
+    });
+    // show confetti once
+    fireConfetti();
+  }
+}
+
+// ---- Confetti ----
+function rand(min,max){return Math.random()*(max-min)+min}
+function fireConfetti(){
+  // simple confetti: create many colored rectangles that fall
+  const count = 36;
+  for(let i=0;i<count;i++){
+    const el = document.createElement('div');
+    el.className='confetti-piece';
+    el.style.left = rand(10,90)+'%';
+    el.style.top = '-10px';
+    el.style.width = Math.round(rand(6,14))+'px';
+    el.style.height = Math.round(rand(8,18))+'px';
+    el.style.background = `hsl(${Math.round(rand(80,160))} ${Math.round(rand(50,80))}% ${Math.round(rand(45,60))}% )`;
+    document.body.appendChild(el);
+    const dur = rand(1800,3200);
+    el.animate([
+      {transform:`translateY(0) rotate(${rand(0,360)}deg)`, opacity:1},
+      {transform:`translateY(${rand(600,1200)}px) rotate(${rand(360,900)}deg)`, opacity:0.8}
+    ],{duration:dur,iterations:1,easing:'cubic-bezier(.2,.6,.2,1)'});
+    setTimeout(()=>el.remove(), dur+30);
+  }
+}
+
+// ---- Interaction ----
+randomBtn.addEventListener('click',()=>{
+  const newSeed = uid();
+  buildCard(newSeed);
+});
+
+resetMarksBtn.addEventListener('click',()=>{
+  marks.clear();
+  // re-render markings (center remains marked)
+  qsa('.tile').forEach(t=>{
+    const idx = Number(t.dataset.index);
+    t.classList.remove('marked');
+    if(idx===12){t.classList.add('marked'); marks.add(12);} 
+  });
+  checkBingo();
+});
+
+copyLinkBtn.addEventListener('click',async()=>{
+  const url = new URL(window.location.href);
+  url.searchParams.set('seed', currentSeed || uid());
+  try{
+    await navigator.clipboard.writeText(url.toString());
+    copyLinkBtn.innerText='Link Copied!';
+    setTimeout(()=>copyLinkBtn.innerText='Copy Link',1300);
+  }catch(e){
+    alert('Could not copy automatically — use the URL bar to copy the link.');
+  }
+});
+
+savePhrasesBtn.addEventListener('click',()=>{
+  const raw = phrasesInput.value.split('\n').map(s=>s.trim()).filter(Boolean);
+  if(raw.length===0){ if(!confirm('You cleared all phrases — restore defaults?')) return; phrases = DEFAULT_PHRASES.slice(); savePhrases(phrases); phrasesInput.value = phrases.join('\n'); buildCard(currentSeed || uid()); return; }
+  phrases = raw.slice();
+  savePhrases(phrases);
+  alert('Phrases saved. Click Get Random Card to generate a new card using them.');
+});
+
+restoreDefaultsBtn.addEventListener('click',()=>{
+  if(!confirm('Restore the original phrase list? This will overwrite your local list.')) return;
+  phrases = DEFAULT_PHRASES.slice();
+  savePhrases(phrases);
+  phrasesInput.value = phrases.join('\n');
+  buildCard(uid());
+});
+
+// ---- Init ----
+function init(){
+  phrasesInput.value = phrases.join('\n');
+  // try to read seed from url
+  const url = new URL(window.location.href);
+  const seedParam = url.searchParams.get('seed');
+  if(seedParam){
+    buildCard(seedParam);
+  } else {
+    buildCard(uid());
+  }
+  // ensure center free is visually marked
+  const centerTile = gridEl.querySelector(`[data-index='12']`);
+  if(centerTile) centerTile.classList.add('marked');
+}
+
+init();
+</script>
+</body>
+</html>
